@@ -44,9 +44,6 @@ export default function App() {
   const refreshBackendStatus = async () => {
     const status = await checkBackendStatus();
     setBackendStatus(status);
-    if (status.connected) {
-      setAgents(prev => prev.map(a => ({ ...a, status: 'online' })));
-    }
   };
 
   useEffect(() => {
@@ -158,6 +155,9 @@ export default function App() {
 
     try {
       const response = await askAgent(text, selectedAgentId);
+      if (!response.success) {
+        throw new Error(response.error || 'Request failed.');
+      }
       const resolvedAgent = agents.find(a => a.id === response.agentId) || agents[0];
 
       const aiMsg = {
@@ -188,7 +188,7 @@ export default function App() {
         agentRole: 'Software Developer',
         agentColor: '#ef4444',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        text: 'Sorry, could not communicate with Agent Mesh. Check the connection in Settings.',
+       text: 'Error: ' + (err.message || 'Unable to connect '),
         toolActivities: []
       };
       setChats(prev => prev.map(c => {

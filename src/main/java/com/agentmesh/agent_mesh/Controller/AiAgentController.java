@@ -18,9 +18,13 @@ public class AiAgentController {
         this.aiService = aiService;
         this.agentIntercomm= agentIntercomm;
     }
+
     @GetMapping("/ask")
-    public String ask(@RequestParam String question) {
-        return aiService.ask(question);
+    public String ask(
+            @RequestParam String question,
+            @RequestParam(defaultValue = "auto") String agentId) {
+
+        return aiService.ask(question, agentId);
     }
     @PostMapping("/assign")
     public String assign(

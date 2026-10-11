@@ -28,8 +28,13 @@ export async function checkBackendStatus() {
  */
 export async function askAgent(question, preferredAgentId = "software-agent") {
   try {
+    const params = new URLSearchParams({
+      question,
+      agentId: preferredAgentId || "auto"
+    });
+
     const response = await fetch(
-      BACKEND_URL + "/agent/ask?question=" + encodeURIComponent(question)
+      `${BACKEND_URL}/agent/ask?${params.toString()}`
     );
 
     if (!response.ok) {
@@ -45,7 +50,7 @@ export async function askAgent(question, preferredAgentId = "software-agent") {
     };
 
   } catch (error) {
-    console.error("Agent Mesh backend request failed:", error);
+    console.error("Request failed:", error);
 
     return {
       success: false,

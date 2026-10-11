@@ -22,7 +22,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', onLo
   const [mode, setMode] = useState(initialMode); // 'login' | 'signup'
   const [email, setEmail] = useState('developer@agentmesh.ai');
   const [password, setPassword] = useState('••••••••••••');
-  const [name, setName] = useState('Alex Carter');
+  const [name, setName] = useState('Login');
   const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -35,7 +35,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', onLo
     setTimeout(() => {
       setIsLoading(false);
       const userProfile = {
-        name: mode === 'signup' ? name : 'Alex Carter',
+        name: mode === 'signup' ? name : 'Login',
         email: email,
         role: 'Lead Architect',
         avatar: '👨‍💻'
@@ -52,7 +52,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', onLo
     setTimeout(() => {
       setIsLoading(false);
       const userProfile = {
-        name: 'Alex Carter',
+        name: 'Login',
         email: 'alex@agentmesh.ai',
         role: 'Autonomous AI Engineer',
         avatar: '⚡'
@@ -111,7 +111,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', onLo
                 <User size={16} className="auth-field-icon" />
                 <input
                   type="text"
-                  placeholder="Alex Carter"
+                  placeholder="Login"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
