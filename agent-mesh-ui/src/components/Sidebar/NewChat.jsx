@@ -8,7 +8,7 @@ export default function NewChat({ onNewChat }) {
         <Plus size={16} strokeWidth={2.5} />
       </div>
       <span>New Chat</span>
-      <span className="kbd-shortcut">Ctrl+N</span>
+      <span className="kbd-shortcut"></span>
     </button>
   );
 }

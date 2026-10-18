@@ -62,7 +62,7 @@ export default function LandingNavbar({
             className="landing-getstarted-btn"
             onClick={onOpenSignup}
           >
-            <span>Get Started</span>
+            <span> Sign In</span>
             <ArrowRight size={14} />
           </button>
         </div>

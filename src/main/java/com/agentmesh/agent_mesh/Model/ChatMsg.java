@@ -33,7 +33,6 @@ public class ChatMsg {
     }
 
     public Long getId() { return id; }
-    public ChatMemory getConversation() { return chatMemory; }
     public void setConversation(ChatMemory chatMemory) { this.chatMemory = chatMemory;
 
     }
