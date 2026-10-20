@@ -73,6 +73,58 @@ function cleanResponse(text) {
   return text.trim();
 }
 
+
+  export async function getChats() {
+    const response = await fetch(`${BACKEND_URL}/api/chats`);
+    if (!response.ok) throw new Error("Failed to load conversations");
+    return response.json();
+  }
+
+  export async function createChat(title, agentId) {
+    const response = await fetch(`${BACKEND_URL}/api/chats`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, agentId })
+    });
+
+    if (!response.ok) throw new Error("Failed to create conversation");
+    return response.json();
+  }
+
+  export async function getChat(chatId) {
+    const response = await fetch(`${BACKEND_URL}/api/chats/${chatId}`);
+    if (!response.ok) throw new Error("Failed to load conversation");
+    return response.json();
+  }
+
+  export async function saveChatMessage(chatId, message) {
+    const response = await fetch(
+      `${BACKEND_URL}/api/chats/${chatId}/messages`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sender: message.sender,
+          agentId: message.agentId || null,
+          agentName: message.agentName || null,
+          agentRole: message.agentRole || null,
+          agentColor: message.agentColor || null,
+          content: message.text
+        })
+      }
+    );
+
+    if (!response.ok) throw new Error("Failed to save message");
+    return response.json();
+  }
+
+  export async function deleteChatFromBackend(chatId) {
+    const response = await fetch(`${BACKEND_URL}/api/chats/${chatId}`, {
+      method: "DELETE"
+    });
+
+    if (!response.ok) throw new Error("Failed to delete conversation");
+  }
 function simulateAgentResponse(question, forcedAgentId) {
   const q = question.toLowerCase();
 
@@ -87,6 +139,7 @@ function simulateAgentResponse(question, forcedAgentId) {
       agentId = "software-agent";
     }
   }
+
 
   if (agentId === "designer-agent") {
     return {

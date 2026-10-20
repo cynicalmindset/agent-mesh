@@ -6,8 +6,16 @@ import Sidebar from './components/Sidebar/Sidebar';
 import Chat from './components/Chat/Chat';
 import Workspace from './components/Workspace/Workspace';
 import SettingsModal from './components/Settings/SettingsModal';
-import { AGENTS, INITIAL_CHATS, WORKSPACE_FILES, MOCK_DIFFS } from './data/mockData';
-import { checkBackendStatus, askAgent } from './services/api';
+import { AGENTS, WORKSPACE_FILES, MOCK_DIFFS } from './data/mockData';
+    import {
+  checkBackendStatus,
+  askAgent,
+  getChats,
+  createChat,
+  getChat,
+  saveChatMessage,
+  deleteChatFromBackend
+} from './services/api';
 import './App.css';
 
 export default function App() {
@@ -24,9 +32,54 @@ export default function App() {
     } catch {
       return null;
     }
-  });
+});
+useEffect(() => {
+  let cancelled = false;
 
-  const [chats, setChats] = useState(INITIAL_CHATS);
+  async function loadChats() {
+    try {
+      const data = await getChats();
+
+      if (!cancelled) {
+        setChats(data.map(chat => ({
+          id: String(chat.id),
+          title: chat.title,
+          updatedAt: chat.updatedAt,
+          activeAgentId: chat.agentId,
+          messages: (chat.messages || []).map(message => ({
+            id: String(message.id),
+            sender: message.sender,
+            text: message.content,
+            agentId: message.agentId,
+            agentName: message.agentName,
+            agentRole: message.agentRole,
+            agentColor: message.agentColor,
+            timestamp: message.createdAt
+              ? new Date(message.createdAt).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit"
+                })
+              : ""
+          }))
+        })));
+      }
+    } catch (error) {
+      console.error("Failed to load saved chats:", error);
+    } finally {
+      if (!cancelled) setChatsLoaded(true);
+    }
+  }
+
+  loadChats();
+
+  return () => {
+    cancelled = true;
+  };
+}, []);
+
+
+  const [chats, setChats] = useState([]);
+  const [chatsLoaded, setChatsLoaded] = useState(false);
   const [activeChatId, setActiveChatId] = useState(null); // null shows hero screen in app
   const [agents, setAgents] = useState(AGENTS);
   const [selectedAgentId, setSelectedAgentId] = useState('auto');
@@ -101,106 +154,177 @@ export default function App() {
     setViewMode('chat');
   };
 
-  const handleSelectChat = (chatId) => {
-    setActiveChatId(chatId);
+  const handleSelectChat = async (chatId) => {
+    setActiveChatId(String(chatId));
     setViewMode('chat');
-  };
 
-  const handleDeleteChat = (chatId) => {
-    setChats(prev => prev.filter(c => c.id !== chatId));
-    if (activeChatId === chatId) {
-      setActiveChatId(null);
+    try {
+      const chat = await getChat(chatId);
+
+      const loadedChat = {
+        id: String(chat.id),
+        title: chat.title,
+        updatedAt: chat.updatedAt,
+        activeAgentId: chat.agentId,
+        messages: (chat.messages || []).map(message => ({
+          id: String(message.id),
+          sender: message.sender,
+          text: message.content,
+          agentId: message.agentId,
+          agentName: message.agentName,
+          agentRole: message.agentRole,
+          agentColor: message.agentColor,
+          timestamp: message.createdAt
+            ? new Date(message.createdAt).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit'
+              })
+            : ''
+        }))
+      };
+
+      setChats(prev => [
+        loadedChat,
+        ...prev.filter(c => c.id !== loadedChat.id)
+      ]);
+    } catch (error) {
+      console.error("Failed to open chat:", error);
     }
   };
+
+
+ const handleDeleteChat = async (chatId) => {
+   try {
+     await deleteChatFromBackend(chatId);
+
+     setChats(prev => prev.filter(c => c.id !== String(chatId)));
+
+     if (String(activeChatId) === String(chatId)) {
+       setActiveChatId(null);
+     }
+   } catch (error) {
+     console.error("Failed to delete chat:", error);
+     alert("Could not delete this conversation.");
+   }
+ };
 
   const handleSelectAgent = (agentId) => {
     setSelectedAgentId(agentId);
   };
 
-  const handleSendMessage = async (text) => {
-    if (!text.trim() || loading) return;
+ const handleSendMessage = async (text) => {
+   if (!text.trim() || loading) return;
 
-    const userMsg = {
-      id: 'msg-' + Date.now(),
-      sender: 'user',
-      text: text,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
+   setLoading(true);
 
-    let targetChatId = activeChatId;
+   let targetChatId = activeChatId;
 
-    if (!targetChatId) {
-      const newId = 'chat-' + Date.now();
-      const firstTitle = text.slice(0, 28) + (text.length > 28 ? '...' : '');
-      const newChatObj = {
-        id: newId,
-        title: firstTitle,
-        updatedAt: 'Just now',
-        activeAgentId: selectedAgentId,
-        messages: [userMsg]
-      };
-      setChats(prev => [newChatObj, ...prev]);
-      setActiveChatId(newId);
-      targetChatId = newId;
-    } else {
-      setChats(prev => prev.map(c => {
-        if (c.id === targetChatId) {
-          return { ...c, messages: [...c.messages, userMsg], updatedAt: 'Just now' };
-        }
-        return c;
-      }));
-    }
+   const userMsg = {
+     id: 'msg-' + Date.now(),
+     sender: 'user',
+     text,
+     timestamp: new Date().toLocaleTimeString([], {
+       hour: '2-digit',
+       minute: '2-digit'
+     })
+   };
 
-    setLoading(true);
+   try {
+     if (!targetChatId) {
+       const created = await createChat(
+         text.slice(0, 28) + (text.length > 28 ? '...' : ''),
+         selectedAgentId
+       );
 
-    try {
-      const response = await askAgent(text, selectedAgentId);
-      if (!response.success) {
-        throw new Error(response.error || 'Request failed.');
-      }
-      const resolvedAgent = agents.find(a => a.id === response.agentId) || agents[0];
+       targetChatId = String(created.id);
+       setActiveChatId(targetChatId);
 
-      const aiMsg = {
-        id: 'msg-ai-' + Date.now(),
-        sender: 'ai',
-        agentId: resolvedAgent.id,
-        agentName: resolvedAgent.name,
-        agentRole: resolvedAgent.role,
-        agentColor: resolvedAgent.accentColor,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        text: response.text,
-        toolActivities: response.toolActivities || []
-      };
+       setChats(prev => [{
+         id: targetChatId,
+         title: created.title,
+         updatedAt: created.updatedAt,
+         activeAgentId: selectedAgentId,
+         messages: []
+       }, ...prev.filter(c => c.id !== targetChatId)]);
+     }
 
-      setChats(prev => prev.map(c => {
-        if (c.id === targetChatId) {
-          return { ...c, messages: [...c.messages, aiMsg] };
-        }
-        return c;
-      }));
-    } catch (err) {
-      console.error("Agent error:", err);
-      const errorMsg = {
-        id: 'msg-err-' + Date.now(),
-        sender: 'ai',
-        agentId: 'software-agent',
-        agentName: 'AgentCoder',
-        agentRole: 'Software Developer',
-        agentColor: '#ef4444',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-       text: 'Error: ' + (err.message || 'Unable to connect '),
-        toolActivities: []
-      };
-      setChats(prev => prev.map(c => {
-        if (c.id === targetChatId) {
-          return { ...c, messages: [...c.messages, errorMsg] };
-        }
-        return c;
-      }));
-    } finally {
-      setLoading(false);
-    }
-  };
+     await saveChatMessage(targetChatId, userMsg);
+
+     setChats(prev => prev.map(chat =>
+       chat.id === targetChatId
+         ? {
+             ...chat,
+             messages: [...chat.messages, userMsg],
+             updatedAt: new Date().toISOString()
+           }
+         : chat
+     ));
+
+     const response = await askAgent(text, selectedAgentId);
+
+     if (!response.success) {
+       throw new Error(response.error || 'Request failed.');
+     }
+
+     const resolvedAgent =
+       agents.find(a => a.id === response.agentId) || agents[0];
+
+     const aiMsg = {
+       id: 'msg-ai-' + Date.now(),
+       sender: 'ai',
+       agentId: resolvedAgent.id,
+       agentName: resolvedAgent.name,
+       agentRole: resolvedAgent.role,
+       agentColor: resolvedAgent.accentColor,
+       timestamp: new Date().toLocaleTimeString([], {
+         hour: '2-digit',
+         minute: '2-digit'
+       }),
+       text: response.text,
+       toolActivities: response.toolActivities || []
+     };
+
+     await saveChatMessage(targetChatId, aiMsg);
+
+     setChats(prev => prev.map(chat =>
+       chat.id === targetChatId
+         ? {
+             ...chat,
+             messages: [...chat.messages, aiMsg],
+             updatedAt: new Date().toISOString()
+           }
+         : chat
+     ));
+   } catch (error) {
+     console.error("Chat error:", error);
+
+     const errorMsg = {
+       id: 'msg-err-' + Date.now(),
+       sender: 'ai',
+       agentId: 'software-agent',
+       agentName: 'AgentCoder',
+       agentRole: 'Software Developer',
+       agentColor: '#ef4444',
+       timestamp: new Date().toLocaleTimeString([], {
+         hour: '2-digit',
+         minute: '2-digit'
+       }),
+       text: 'Error: ' + (error.message || 'Unable to complete request.'),
+       toolActivities: []
+     };
+
+     if (targetChatId) {
+       setChats(prev => prev.map(chat =>
+         chat.id === targetChatId
+           ? { ...chat, messages: [...chat.messages, errorMsg] }
+           : chat
+       ));
+     }
+   } finally {
+     setLoading(false);
+   }
+ };
+
 
   const handleOpenFileInWorkspace = (languageOrPath) => {
     if (languageOrPath === 'java') {
